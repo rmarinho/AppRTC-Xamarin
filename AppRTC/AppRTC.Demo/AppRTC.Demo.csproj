@@ -108,15 +108,31 @@
   <ItemGroup>
     <Compile Include="Main.cs" />
     <Compile Include="AppDelegate.cs" />
-    <Compile Include="ViewController.cs" />
-    <Compile Include="ViewController.designer.cs">
-      <DependentUpon>ViewController.cs</DependentUpon>
+    <Compile Include="ARTCRoomViewController.cs" />
+    <Compile Include="ARTCRoomViewController.designer.cs">
+      <DependentUpon>ARTCRoomViewController.cs</DependentUpon>
+    </Compile>
+    <Compile Include="ARTCVideoChatViewController.cs" />
+    <Compile Include="ARTCVideoChatViewController.designer.cs">
+      <DependentUpon>ARTCVideoChatViewController.cs</DependentUpon>
+    </Compile>
+    <Compile Include="ARTCRoomTextInputViewCell.cs" />
+    <Compile Include="ARTCRoomTextInputViewCell.designer.cs">
+      <DependentUpon>ARTCRoomTextInputViewCell.cs</DependentUpon>
     </Compile>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\AppRTC\AppRTC.csproj">
       <Project>{A8675957-9FC4-4758-8144-27DF00980354}</Project>
       <Name>AppRTC</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\SocketRocket\SocketRocketBinding\SocketRocketBinding.csproj">
+      <Project>{8D8A4C45-3380-438F-A5D6-6A519052C2C1}</Project>
+      <Name>SocketRocketBinding</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\WebRTC\WebRTCBinding\WebRTCBinding.csproj">
+      <Project>{A6E76C98-216E-4B88-92B6-B77D0E77B55E}</Project>
+      <Name>WebRTCBinding</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\iOS\Xamarin.iOS.CSharp.targets" />
