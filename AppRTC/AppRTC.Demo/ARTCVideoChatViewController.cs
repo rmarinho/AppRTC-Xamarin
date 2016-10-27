@@ -6,7 +6,7 @@ using CoreGraphics;
 
 namespace AppRTC.Demo
 {
-	public partial class ARTCVideoChatViewController : UIViewController, IVideoChatController, IARDAppClientDelegate
+	public partial class ARTCVideoChatViewController : UIViewController, IVideoChatController, IARDAppClientDelegate, IRTCEAGLVideoViewDelegate
 	{
 
 		string roomUrl;
@@ -18,8 +18,8 @@ namespace AppRTC.Demo
 		CGSize localVideoSize;
 		CGSize remoteVideoSize;
 		const string SERVER_HOST_URL = "https://apprtc.appspot.com";
-		RTCEAGLVideoView remoteView;
-		RTCEAGLVideoView localView;
+		internal RTCEAGLVideoView remoteView;
+		internal RTCEAGLVideoView localView;
 
 		UIView footerView;
 		UILabel urlLabel;
@@ -33,7 +33,7 @@ namespace AppRTC.Demo
 		bool isVideoMute;
 
 
-		RTCEAGLVideoViewDelegate _rtcvideoDeleagate;
+		//	RTCEAGLVideoViewDelegate _rtcvideoDeleagate;
 		public ARTCVideoChatViewController(IntPtr handle) : base(handle)
 		{
 		}
@@ -62,9 +62,9 @@ namespace AppRTC.Demo
 
 
 			// //RTCEAGLVideoViewDelegate provides notifications on video frame dimensions
-			_rtcvideoDeleagate = new CustomRTCEAGLVideoViewDelegate(this);
-			remoteView.Delegate = _rtcvideoDeleagate;
-			localView.Delegate = _rtcvideoDeleagate;
+			//	_rtcvideoDeleagate = new CustomRTCEAGLVideoViewDelegate(this);
+			//	remoteView.Delegate = (IRTCEAGLVideoViewDelegate)this;
+			//	localView.Delegate = this;
 
 			base.ViewDidLoad();
 		}
@@ -162,8 +162,7 @@ namespace AppRTC.Demo
 			remoteVideoTrack?.RemoveRenderer(remoteView);
 			remoteVideoTrack = null;
 			remoteView.RenderFrame(null);
-
-			//[self videoView:self.localView didChangeVideoSize:self.localVideoSize];   
+			this.DidChangeVideoSize(localView, localVideoSize);
 		}
 
 		void LocalClear()
@@ -175,8 +174,8 @@ namespace AppRTC.Demo
 
 		void OrientationChanged(NSNotification notification)
 		{
-			// [self videoView:self.localView didChangeVideoSize:self.localVideoSize];
-			// [self videoView:self.remoteView didChangeVideoSize:self.remoteVideoSize];
+			this.DidChangeVideoSize(localView, localVideoSize);
+			this.DidChangeVideoSize(remoteView, remoteVideoSize);
 
 			Console.WriteLine("Received a notification UIDevice", notification);
 		}
@@ -205,7 +204,7 @@ namespace AppRTC.Demo
 		void ZoomRemote()
 		{
 			isZoom = !isZoom;
-			//[self videoView:self.remoteView didChangeVideoSize:self.remoteVideoSize];
+			this.DidChangeVideoSize(remoteView, remoteVideoSize); ;
 		}
 
 		void AudioButton_TouchUpInside(object sender, EventArgs e)
@@ -272,44 +271,102 @@ namespace AppRTC.Demo
 			this.remoteVideoTrack = remoteVideoTrack;
 			this.remoteVideoTrack.AddRenderer(remoteView);
 
-			//[UIView animateWithDuration:0.4f animations:^{
-			//    //Instead of using 0.4 of screen size, we re-calculate the local view and keep our aspect ratio
-			//    UIDeviceOrientation orientation = [[UIDevice currentDevice] orientation];
-			//    CGRect videoRect = CGRectMake(0.0f, 0.0f, self.view.frame.size.width/4.0f, self.view.frame.size.height/4.0f);
-			//    if (orientation == UIDeviceOrientationLandscapeLeft || orientation == UIDeviceOrientationLandscapeRight) {
-			//        videoRect = CGRectMake(0.0f, 0.0f, self.view.frame.size.height/4.0f, self.view.frame.size.width/4.0f);
-			//    }
-			//    CGRect videoFrame = AVMakeRectWithAspectRatioInsideRect(_localView.frame.size, videoRect);
+			UIView.Animate(0.4f, () =>
+			{
+				//    //Instead of using 0.4 of screen size, we re-calculate the local view and keep our aspect ratio
+				UIDeviceOrientation orientation = UIDevice.CurrentDevice.Orientation;
+				var containerWidth = View.Frame.Size.Width;
+				var containerHeight = View.Frame.Size.Height;
+				var videoRect = new CGRect(0.0f, 0.0f, containerWidth / 4.0f, containerHeight / 4.0f);
+				if (orientation == UIDeviceOrientation.LandscapeLeft || orientation == UIDeviceOrientation.LandscapeRight)
+				{
+					videoRect = new CGRect(0.0f, 0.0f, containerHeight / 4.0f, containerWidth / 4.0f);
+				}
+				CGRect videoFrame = AVFoundation.AVUtilities.WithAspectRatio(videoRect, localView.Frame.Size); //AVMakeRectWithAspectRatioInsideRect(aspectRatio, videoRect);
 
-			//    [self.localViewWidthConstraint setConstant:videoFrame.size.width];
-			//    [self.localViewHeightConstraint setConstant:videoFrame.size.height];
+				//    [self.localViewWidthConstraint setConstant:videoFrame.size.width];
+				//    [self.localViewHeightConstraint setConstant:videoFrame.size.height];
 
 
-			//    [self.localViewBottomConstraint setConstant:28.0f];
-			//    [self.localViewRightConstraint setConstant:28.0f];
-			//    [self.footerViewBottomConstraint setConstant:-80.0f];
-			//    [self.view layoutIfNeeded];
-			//}];
+				//    [self.localViewBottomConstraint setConstant:28.0f];
+				//    [self.localViewRightConstraint setConstant:28.0f];
+				//    [self.footerViewBottomConstraint setConstant:-80.0f];
+				View.LayoutIfNeeded();
+			}); ;
+		}
+
+		[Export("videoView:didChangeVideoSize:")]
+		public void DidChangeVideoSize(RTCEAGLVideoView videoView, CGSize size)
+		{
+			UIDeviceOrientation orientation = UIDevice.CurrentDevice.Orientation;
+			UIView.Animate(0.4f, () =>
+			{
+				var containerWidth = View.Frame.Size.Width;
+				var containerHeight = View.Frame.Size.Height;
+				var defaultAspectRatio = new CGSize(4, 3);
+
+				CGSize aspectRatio = size.IsEmpty ? defaultAspectRatio : size;
+				CGRect videoRect = View.Bounds;
+				if (videoView == localView)
+				{
+					//Resize the Local View depending if it is full screen or thumbnail
+					localVideoSize = size;
+
+					if (remoteVideoTrack != null)
+					{
+						videoRect = new CGRect(0.0f, 0.0f, containerWidth / 4.0f, containerHeight / 4.0f);
+						if (orientation == UIDeviceOrientation.LandscapeLeft || orientation == UIDeviceOrientation.LandscapeRight)
+						{
+							videoRect = new CGRect(0.0f, 0.0f, containerHeight / 4.0f, containerWidth / 4.0f);
+						}
+					}
+					CGRect videoFrame = AVFoundation.AVUtilities.WithAspectRatio(videoRect, aspectRatio); //AVMakeRectWithAspectRatioInsideRect(aspectRatio, videoRect);
+
+
+					//			//Resize the localView accordingly
+					//			[self.localViewWidthConstraint setConstant: videoFrame.size.width];
+
+					//			[self.localViewHeightConstraint setConstant:videoFrame.size.height];
+					//            if (self.remoteVideoTrack) {
+					//                [self.localViewBottomConstraint setConstant:28.0f]; //bottom right corner
+					//                [self.localViewRightConstraint setConstant:28.0f];
+					//            } else {
+					//                [self.localViewBottomConstraint setConstant:containerHeight/2.0f - videoFrame.size.height/2.0f]; //center
+					//                [self.localViewRightConstraint setConstant:containerWidth/2.0f - videoFrame.size.width/2.0f]; //center
+					//            }
+				}
+				else if (videoView == remoteView)
+				{
+					//Resize Remote View
+					remoteVideoSize = size;
+
+					CGRect videoFrame = AVFoundation.AVUtilities.WithAspectRatio(videoRect, aspectRatio); //AVMakeRectWithAspectRatioInsideRect(aspectRatio, videoRect);
+					if (isZoom)
+					{
+						//Set Aspect Fill
+						var scale = Math.Max(containerWidth / videoFrame.Size.Width, containerHeight / videoFrame.Size.Height);
+
+						var newSize = new CGSize(videoFrame.Size.Width * scale, videoFrame.Size.Height * scale);
+
+						//videoFrame.Size.Width *= scale;
+						//videoFrame.size.height *= scale;
+						videoFrame.Size = newSize;
+
+					}
+					//            [self.remoteViewTopConstraint setConstant:containerHeight/2.0f - videoFrame.size.height/2.0f];
+					//            [self.remoteViewBottomConstraint setConstant:containerHeight/2.0f - videoFrame.size.height/2.0f];
+					//            [self.remoteViewLeftConstraint setConstant:containerWidth/2.0f - videoFrame.size.width/2.0f]; //center
+					//            [self.remoteViewRightConstraint setConstant:containerWidth/2.0f - videoFrame.size.width/2.0f]; //center
+				}
+				View.LayoutIfNeeded();
+			});
 		}
 
 		public void DidError(IARDAppClient client, NSError error)
 		{
-			UIAlertView alertView = new UIAlertView("", error.ToString(), null, "OK", null);
+			var alertView = new UIAlertView("", error.ToString(), null, "OK", null);
 			alertView.Show();
 			Disconnect();
-		}
-	}
-
-
-	class CustomRTCEAGLVideoViewDelegate : RTCEAGLVideoViewDelegate
-	{
-		ARTCVideoChatViewController _controller;
-		public CustomRTCEAGLVideoViewDelegate(ARTCVideoChatViewController controller)
-		{
-			_controller = controller;
-		}
-		public override void DidChangeVideoSize(RTCEAGLVideoView videoView, CGSize size)
-		{
 		}
 	}
 
